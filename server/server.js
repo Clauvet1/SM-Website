@@ -1,76 +1,136 @@
-const db = require('./firebase-admin');
-
+const { db, auth } = require("./firebase-admin");
 const express = require('express');
 const cors = require('cors');
 const app = express();
 const port = 3001;
-const mentorRouter = require('./controllers/mentorController.js');
 
-app.use('/api/mentors', mentorRouter);
 
-app.use(cors());
+
+app.use(cors({origin:'http://localhost:3000'}));
+// Middleware to parse JSON bodies
 app.use(express.json());
-
 
 // For Signup
 
-app.post('/Signup', (req, res) => {
-  const { userType , fullName, email, password } = req.body;
-  console.log('Received user data:', req.body);
+const bcrypt = require('bcryptjs');
 
-  // Add userType to the user data
+// Function to hash a password
+const hashPassword = async (password) => {
+  try {
+    const salt = await bcrypt.genSalt(10); // Generate salt with 10 rounds
+    const hashedPassword = await bcrypt.hash(password, salt); // Hash password with generated salt
+    return hashedPassword;
+  } catch (error) {
+    console.error('Error hashing password:', error);
+    throw error; // Throw error for handling further up the call stack
+  }
+};
+
+app.post('/Signup', async (req, res) => {
+  const { userType, fullName, email, password, specialty } = req.body;
+  console.log('Received user data:', req.body);
+  const hashedPassword = await hashPassword(password);
+
   const userData = {
     fullName,
     email,
-    password,
-    userType,
+    password: hashedPassword,
     timestamp: new Date(),
   };
 
-  // Determine the document path based on the userType
-  const userDocPath = userType === 'mentor'? 'mentor' : 'mentee';
-
-  // Add the user data to the Firestore database
-  db.collection('users')
-    .doc(userDocPath)
-    .collection(userType)
-    .add(userData)
-    .then(() => {
-      console.log('User data added to the database');
-      res.send('User data received successfully');
-    })
-    .catch((error) => {
-      console.error('Error adding user data:', error);
-      res.status(500).send('Error adding user data');
-    });
+  if (userType === 'mentor') {
+    userData.specialty = specialty;
+    try {
+      const mentorRef = await db.collection('mentors').add(userData);
+      console.log(`Mentor document created with ID: ${mentorRef.id} in mentors collection`);
+      res.send(`Mentor data received successfully in mentors collection`);
+    } catch (error) {
+      console.error(`Error adding mentor data to mentors collection:`, error);
+      res.status(500).send(`Error adding mentor data to mentors collection: ${error}`);
+    }
+  } else if (userType === 'mentee') {
+    try {
+      const menteeRef = await db.collection('mentees').add(userData);
+      console.log(`Mentee document created with ID: ${menteeRef.id} in mentees collection`);
+      res.send(`Mentee data received successfully in mentees collection`);
+    } catch (error) {
+      console.error(`Error adding mentee data to mentees collection:`, error);
+      res.status(500).send(`Error adding mentee data to mentees collection: ${error}`);
+    }
+  } else {
+    res.status(400).send('Invalid userType');
+  }
 });
+
 
 
 // For Login
 
-// app.post('/Login', (req, res) => {
-//   const { email, password } = req.body;
-//   console.log('Received login data:', req.body);
+app.post("/api/login", async (req, res) => {
+  const { email, password, userType } = req.body;
 
-//   // Authenticate the user based on their email and password
-//   db.collection('users')
-//     .where('email', '==', email)
-//     .where('password', '==', password)
-//     .get()
-//     .then((querySnapshot) => {
-//       if (querySnapshot.empty) {
-//         console.log('No matching user found');
-//         res.status(404).send('No matching user found');
-//       } else {
-//         console.log('User found:', querySnapshot.docs[0].data());
-//         res.send('User authenticated successfully');
-//       }
-//     })
-//     .catch((error) => {
-//       console.error('Error authenticating user:', error);
-//       res.status(500).send('Error authenticating user');
-//     });
-// });
+  try {
+    // Authenticate the user with the Firebase Realtime Database
+    const snapshot = await db.collection(userType).get();
+
+    const mentorData = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      mentorData.push({
+        id: doc.id,
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password,
+      });
+    });
+
+    console.log('data:', mentorData);
+    if (mentorData.empty) {
+      return res.status(400).json({ success: false, message: "User not found" });
+    }
+
+    const user = mentorData[0]; // Get the first element of the array
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ success: false, message: "Invalid email or password" });
+    }
+
+    // Generate a custom token for the user
+    const customToken = await auth.createCustomToken(user.id); // Use the id property instead of uid
+
+    // Send the custom token back to the client
+    res.json({ success: true, token: customToken });
+  } catch (error) {
+    console.log("Error in login endpoint:", error);
+    res.status(500).json({ success: false, message: "An error occurred while logging in. Please try again later." });
+  }
+});
+
+//For Mentors
+
+app.get('/api/mentors', async (req, res) => {
+  try {
+    const snapshot = await db.collection('mentors').get();
+
+    const mentorData = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      mentorData.push({
+        id: doc.id,
+        fullName: data.fullName,
+        email: data.email,
+        specialty: data.specialty,
+      });
+    });
+
+    res.json(mentorData);
+  } catch (error) {
+    console.error('Error fetching mentors:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 
 
 //For Messaging
@@ -104,6 +164,18 @@ app.get('/messages', async (req, res) => {
     console.error(error);
     res.status(500).json({ error: 'An error occurred while retrieving messages.' });
   }
+});
+
+
+// For logout
+
+app.post("/api/logout", async (req, res) => {
+  // Invalidate the user's session
+  req.destroy();
+
+  
+  // Redirect the user to the login page
+  res.redirect("/login");
 });
 
 app.listen(port, () => {
