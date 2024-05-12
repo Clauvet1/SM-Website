@@ -108,17 +108,21 @@ app.post("/api/login", async (req, res) => {
 
 //For Mentors
 
+const path = require('path'); // Import the path module
+
 app.get('/api/mentors', async (req, res) => {
   try {
     const snapshot = await db.collection('mentors').get();
 
     const mentorData = [];
+    
     snapshot.forEach(doc => {
       const data = doc.data();
+      
       mentorData.push({
         id: doc.id,
         fullName: data.fullName,
-        email: data.email,
+        bio: data.bio,
         specialty: data.specialty,
       });
     });
@@ -131,6 +135,35 @@ app.get('/api/mentors', async (req, res) => {
 });
 
 
+
+
+
+// For MentorEditProfile
+
+app.post('/upload', async (req, res) => {
+  const {fullName, email, phone, language, school, specialty, bio } = req.body;
+  console.log('Received user data:', req.body);
+
+  const userData = {
+    fullName,
+    email,
+    phone, 
+    language, 
+    school,
+    specialty, 
+    bio,
+    timestamp: new Date(),
+  };
+
+  try {
+    const mentorRef = await db.collection('mentors').add(userData);
+    console.log(`Mentor document created with ID: ${mentorRef.id} in mentors collection`);
+    res.send(`Mentor data received successfully in mentors collection`);
+  } catch (error) {
+    console.error(`Error adding mentor data to mentors collection:`, error);
+    res.status(500).send(`Error adding mentor data to mentors collection: ${error}`);
+  }
+});
 
 
 //For Messaging
@@ -175,7 +208,7 @@ app.post("/api/logout", async (req, res) => {
 
   
   // Redirect the user to the login page
-  res.redirect("/login");
+  res.redirect("http://localhost:3000/login");
 });
 
 app.listen(port, () => {
