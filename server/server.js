@@ -85,11 +85,19 @@ app.post("/api/login", async (req, res) => {
     });
 
     console.log('data:', mentorData);
-    if (mentorData.empty) {
+    let user = null;
+
+    for (const u of mentorData) {
+      if (u.email === email) {
+        user = u;
+        break;
+      }
+    }
+
+    if (!user) {
       return res.status(400).json({ success: false, message: "User not found" });
     }
 
-    const user = mentorData[0]; // Get the first element of the array
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(400).json({ success: false, message: "Invalid email or password" });
@@ -108,40 +116,13 @@ app.post("/api/login", async (req, res) => {
 
 //For Mentors
 
-const path = require('path'); // Import the path module
-
-app.get('/api/mentors', async (req, res) => {
-  try {
-    const snapshot = await db.collection('mentors').get();
-
-    const mentorData = [];
-    
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      
-      mentorData.push({
-        id: doc.id,
-        fullName: data.fullName,
-        bio: data.bio,
-        specialty: data.specialty,
-      });
-    });
-
-    res.json(mentorData);
-  } catch (error) {
-    console.error('Error fetching mentors:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-
-
-
+const mentors = require('./routes/mentors');
+app.use('/api/mentors', mentors);
 
 // For MentorEditProfile
 
 app.post('/upload', async (req, res) => {
-  const {fullName, email, phone, language, school, specialty, bio } = req.body;
+  const {fullName, email, phone, language, school, specialty, bio, userType, location } = req.body;
   console.log('Received user data:', req.body);
 
   const userData = {
@@ -150,21 +131,37 @@ app.post('/upload', async (req, res) => {
     phone, 
     language, 
     school,
+    location,
     specialty, 
     bio,
     timestamp: new Date(),
   };
-
-  try {
-    const mentorRef = await db.collection('mentors').add(userData);
-    console.log(`Mentor document created with ID: ${mentorRef.id} in mentors collection`);
-    res.send(`Mentor data received successfully in mentors collection`);
-  } catch (error) {
-    console.error(`Error adding mentor data to mentors collection:`, error);
-    res.status(500).send(`Error adding mentor data to mentors collection: ${error}`);
-  }
+    if(userType === 'mentee'){
+      try {
+        const mentorRef = await db.collection('mentees').add(userData);
+        console.log(`Mentor document created with ID: ${mentorRef.id} in mentors collection`);
+        res.send(`Mentor data received successfully in mentors collection`);
+      } catch (error) {
+        console.error(`Error adding mentor data to mentors collection:`, error);
+        res.status(500).send(`Error adding mentor data to mentors collection: ${error}`);
+      }
+    } 
+    if(userType === 'mentor'){
+      try {
+        const mentorRef = await db.collection('mentors').add(userData);
+        console.log(`Mentor document created with ID: ${mentorRef.id} in mentors collection`);
+        res.send(`Mentor data received successfully in mentors collection`);
+      } catch (error) {
+        console.error(`Error adding mentor data to mentors collection:`, error);
+        res.status(500).send(`Error adding mentor data to mentors collection: ${error}`);
+      }
+    }
+  
 });
 
+//For Mentee
+const mentees = require('./routes/mentees');
+app.use('/api/mentees', mentees);
 
 //For Messaging
 // Sending Message
