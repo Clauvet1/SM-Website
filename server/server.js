@@ -67,6 +67,42 @@ app.get('/messages', async (req, res) => {
   }
 });
 
+//middleware to verify token
+const verifyToken = async (req, res, next) => {
+  const token = req.headers['authorization'];
+  if (!token) {
+    return res.status(401).send({ error: 'Unauthorized' });
+  }
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.uid = decodedToken.uid;
+    next();
+  } catch(error) {
+    return res.status(401).send({ error: 'Invalid token' });
+  }
+};
+app.get('/api/profile', verifyToken, async (req, res) => {
+  try {
+    const user = await admin.auth().getUser(req.uid);
+    const userData = {
+      name: user.displayName,
+      email: user.email,
+      photoURL: user.photoURL,
+      uid: user.uid,
+    };
+    // Add any additional data you want to retrieve from your database
+    // For example, if you have a Firestore collection called "users"
+    // const userDoc = await db.collection('users').doc(req.uid).get();
+    // if (userDoc.exists) {
+    //   userData.skills = userDoc.data().skills;
+    //   // Add any other fields you want to retrieve
+    // }
+    res.send(userData);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ error: 'An error occurred while retrieving user data.' });
+  }
+});
 
 // For logout
 const logout = require('./routes/logout');
