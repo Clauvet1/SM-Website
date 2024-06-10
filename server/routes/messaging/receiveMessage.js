@@ -4,7 +4,7 @@ const { db } = require("../../firebase-admin");
 const jwt = require('jsonwebtoken');
 const pusher = require('../../push');
 
-router.get('/', (req, res) => {
+router.get('/:id', (req, res) => {
   const token = req.headers.authorization.split(' ')[1];
 
   if (!token) {
@@ -17,9 +17,10 @@ router.get('/', (req, res) => {
   }
 
   const userId = decodedToken.uid;
-
+  const recipientId = req.params.id;
   db.collection('messages')
     .where('recipientId', '==', userId)
+    .where('senderId', '==', recipientId )
     .get()
     .then((querySnapshot) => {
       const receivedMessages = querySnapshot.docs.map((doc) => doc.data());
