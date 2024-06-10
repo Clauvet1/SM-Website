@@ -19,16 +19,7 @@ router.put('/', async (req, res) => {
 
   const uid = decodedToken.uid;
   const userType = 'mentees';
-  const {
-    fullName,
-    email,
-    phone,
-    language,
-    school,
-    specialty,
-    bio,
-    location
-  } = req.body;
+  const { fullName, email, phone, language, school, specialty, bio, location, department, skills} = req.body;
 
   console.log('Received user data:', req.body);
 
@@ -40,12 +31,14 @@ router.put('/', async (req, res) => {
   if (school) userData.school = school;
   if (location) userData.location = location;
   if (specialty) userData.specialty = specialty;
+  if (skills) userData.skills = skills;
+  if (department) userData.department = department;
   if (bio) userData.bio = bio;
 
-  // // Add a timestamp if any field is updated
-  // if (Object.keys(userData).length > 0) {
-  //   userData.timestamp = new Date();
-  // }
+  // Add a timestamp if any field is updated
+  if (Object.keys(userData).length > 0) {
+    userData.timestamp = new Date();
+  }
 
   try {
     await db.collection(userType).doc(uid).update(userData);
@@ -57,4 +50,4 @@ router.put('/', async (req, res) => {
   }
 });
 
-module.exports = router;
+    module.exports = router;
