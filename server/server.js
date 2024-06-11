@@ -45,6 +45,13 @@ app.use('/api/mentor-profile', mentorProfile);
 const menteeProfile = require('./routes/menteeProfile');
 app.use('/api/mentee-profile', menteeProfile);
 
+//  View profile
+const mentorProfileView = require('./routes/mentorProfileView');
+app.use('/api/mentor-profile-view', mentorProfileView);
+
+const menteeProfileView = require('./routes/menteeProfileView');
+app.use('/api/mentee-profile-view', menteeProfileView);
+
 // For logout
 const logout = require('./routes/logout');
 app.use('/api/logout', logout);
