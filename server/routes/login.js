@@ -23,9 +23,11 @@ router.post("/", async (req, res) => {
       if (data.email === email) {
         userId = doc.id;
         userPassword = data.password;
-        userName = data.fullName; // Assuming `fullName` is the field for the user's name
+        userName = data.fullName; 
+     
       }
     });
+    console.log(userName, userId);
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User not found" });
@@ -37,7 +39,7 @@ router.post("/", async (req, res) => {
     }
 
     // Generate a custom token for the user
-    const customToken = await auth.createCustomToken(userId, { userType }); 
+    const customToken = await auth.createCustomToken(userId, { userName, userType, email }); 
 
     // Decode the custom token to check its structure
     const decodedToken = jwt.decode(customToken);
